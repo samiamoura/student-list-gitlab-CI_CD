@@ -1,0 +1,18 @@
+---
+- name: Ensure application is deployed
+  hosts: localhost
+
+  become: true
+  vars_files:
+    - "files/secrets/devops.yml"
+  tasks: 
+  - name: Check that you can connect (GET) to a page and it returns a status 200
+    uri:
+      url: http://{{ ip_addr_app }}
+
+  - name: Check webservice
+    uri:
+      url: http://{{ ip_addr_app }}:{{ port_app }}/pozos/api/v1.0/get_student_ages
+      user: "{{ login_app }}"
+      password: "{{ password_app }}"
+      method: GET

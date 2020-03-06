@@ -1,0 +1,11 @@
+[build]
+#localhost ansible_connection=local
+18.208.248.44 ansible_user=centos ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[prod]
+3.92.141.46 ansible_user=centos ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+#[all:children]
+#prod
+#build
+#

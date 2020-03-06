@@ -1,0 +1,106 @@
+---
+stages:
+  - preflight
+  - check
+  - build
+  - deploy
+  - check_after_deploy
+
+# Generic preflight template
+.preflight: &preflight
+  stage: preflight
+  tags:
+    - ansible
+
+# Generic Ansible template
+.ansible: &ansible
+  image: registry.gitlab.com/robconnolly/docker-ansible:latest
+  before_script:
+    - ansible --version
+    - echo $ANSIBLE_VAULT_PASSWORD > vault.key
+    - echo "$DEPLOYMENT_SSH_KEY" > id_rsa
+    - chmod 600 id_rsa
+    - ansible-galaxy install -r roles/requirements.yml
+  after_script:
+    - rm vault.key id_rsa
+  tags:
+    - ansible
+
+# Preflight jobs
+shellcheck:
+  <<: *preflight
+  image: koalaman/shellcheck-alpine:stable
+  before_script:
+    - shellcheck --version
+    - apk --no-cache add grep
+  script:
+    - |
+      for file in $(grep -IRl "#\!\(/usr/bin/env \|/bin/\)" \
+            --exclude-dir ".git" .); do
+        if ! shellcheck -x $file; then
+          export FAILED=1
+        else
+          echo "$file OK"
+        fi
+      done
+      if [ "${FAILED}" = "1" ]; then
+        exit 1
+      fi
+
+yamllint:
+  <<: *preflight
+  image: sdesbure/yamllint
+  before_script:
+    - yamllint --version
+  script:
+    - yamllint .
+
+markdownlint:
+  <<: *preflight
+  image: ruby:alpine
+  before_script:
+    - apk --no-cache add git
+    - gem install mdl
+    - mdl --version
+  script:
+    - mdl --style all --warnings --git-recurse .
+
+# Ansible check jobs
+ping-hosts:
+  <<: *ansible
+  stage: check
+  script:
+    - ansible all -m ping -i hosts --private-key id_rsa
+
+ansible-lint:
+  <<: *ansible
+  stage: check
+  script:
+    - ansible-lint -x 306 install_student_list.yml
+
+build-student-list:
+  <<: *ansible
+  stage: build
+  script:
+    - ansible-playbook  -i hosts --vault-password-file vault.key --private-key id_rsa --tags "build" --limit build install_student_list.yml
+  only:
+    - master 
+
+deploy-student-list:
+  <<: *ansible
+  stage: deploy
+  script:
+    - ansible-playbook  -i hosts --vault-password-file vault.key --private-key id_rsa --tags "deploy" --limit prod install_student_list.yml
+  only:
+    - master
+
+check-after-deploy:
+  <<: *ansible
+  stage: check_after_deploy
+  script:
+  #  - ansible all -i hosts -m shell -a "bash test_deploy.sh " --vault-password-file vault.key --private-key id_rsa --limit prod 
+  #  - ansible all -i hosts -m shell -a "curl -u toto:python -X GET http://3.92.141.46:4000/pozos/api/v1.0/get_student_ages" --vault-password-file vault.key --private-key id_rsa --limit prod
+     - ansible-playbook  --vault-password-file vault.key check_deploy_app.yml
+  only:
+    - master
+
