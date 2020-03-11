@@ -4,7 +4,7 @@
 
 ## Project description
 
-- This is a complete pipeline CI/CD with GitLab to deploy a python application in production
+- This is a complete pipeline CI/CD with **GitLab** to deploy a python application in production
 - This infrastructure it's componed of 3 servers (gitlabserver, build server and production server)
 - We use Ansible, Docker, Git and Gitlab tools
 - The differents stages are :
